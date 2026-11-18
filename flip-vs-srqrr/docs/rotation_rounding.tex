@@ -1,0 +1,203 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,booktabs,graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[compact]{titlesec}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue]{hyperref}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\1}{\mathbf{1}}
+\newcommand{\frc}{\operatorname{frac}}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+\begin{center}
+{\Large\bfseries Rotation rounding: a stateless replacement for stochastic rounding}\\[4pt]
+{\small Method note, 10 November 2026}
+\end{center}
+
+\textbf{In one paragraph.} When weights are trained directly on a low-bit grid, every update has to be rounded back
+onto the grid, and the rounding errors pile up in the weights. Stochastic rounding (SR) rounds up with a fresh random
+threshold each step: it is unbiased, but its errors are independent, so they never cancel and the accumulated error
+grows like a random walk. Rotation rounding keeps SR's per-step behaviour exactly, but takes its thresholds from a
+golden-ratio sequence, so a round-up is soon followed by a round-down. The errors largely cancel, the optimizer sees
+less rounding noise, and it costs no extra memory. In our 2-bit training runs it beats SR at every state budget, by
+up to 0.11 bits per byte.
+
+\section{Setting}
+Each weight lives on a grid with spacing $q$. An optimizer step moves it off the grid and it must be rounded back,
+because only grid values are stored. Measured in grid units, the off-grid position is an integer plus a fraction
+$p_t\in[0,1)$. A rounding rule picks a threshold $u_t\in[0,1)$ and rounds \emph{up} if $u_t<p_t$, otherwise down.
+The rounding error at step $t$, in grid units, is
+\begin{equation}
+e_t=\1[u_t<p_t]-p_t ,
+\end{equation}
+i.e.\ $1-p_t$ if we rounded up and $-p_t$ if we rounded down. Since only the rounded value is kept, the errors add
+up: after $N$ steps the weight sits $q\,S_N$ away from where the exact updates would have put it, where
+\[
+S_N=\textstyle\sum_{t<N}e_t .
+\]
+A rounding rule is just a choice of thresholds $u_t$, and we want it to keep $S_N$ small.
+
+In our experiments the deployed weight has 2 bits (4 levels). A method with $b$ \emph{counter bits} also stores the
+position between deployed levels on a grid $2^b$ times finer, and rounds onto that finer grid. Its training state is
+$2+b$ bits per weight. With $b=0$, every update is rounded straight onto the 4 deployed levels.
+
+\section{The two rules}
+\begin{definition}[Stochastic rounding, SR]
+Draw $u_t$ uniformly from $[0,1)$, independently at every step and for every weight.
+\end{definition}
+\begin{definition}[Rotation rounding]
+Give each weight a random offset $u_0\in[0,1)$ and set
+\[
+u_t=\frc(u_0+t\varphi),\qquad \varphi=\tfrac{\sqrt5-1}{2}\approx0.618,
+\]
+where $\frc(x)=x-\lfloor x\rfloor$ is the fractional part. Each step the threshold moves forward by $0.618$ and wraps
+around $[0,1)$. For example, $u_0=0.9$ gives $u_1=\frc(1.518)=0.518$, then $0.136$, $0.754$, $0.372$, \ldots
+\end{definition}
+\textbf{Storage.} Nothing per weight. The offsets $u_0$ are regenerated each step from a fixed random seed per weight
+matrix; only the global step counter $t$ is stored. In code:
+\begin{verbatim}
+    g = torch.Generator().manual_seed(seed)   # same seed every step
+    u = torch.frac(torch.rand(shape, generator=g) + (t*PHI) % 1)
+    round_up = u < p
+\end{verbatim}
+
+\section{Why rotation is better}
+\textbf{Step 1: each single step is exactly SR.} For a fixed $t$, $u_t$ is uniform on $[0,1)$, because $u_0$ is.
+So rotation rounds up with probability $p_t$, just like SR. Each step is unbiased ($\E e_t=0$) and has the same error
+variance $p_t(1-p_t)$. Rotation gives up nothing SR offers per step. \emph{This holds in any training run.}
+
+\textbf{Step 2: SR's errors form a random walk.} SR draws a fresh threshold that is independent of everything before
+it, including $p_t$, however the gradients reacted to earlier rounding. So each error has mean zero given the past,
+the errors are uncorrelated, and their variances simply add:
+\begin{equation}
+\Var S_N=\textstyle\sum_{t<N}\E[p_t(1-p_t)] .
+\end{equation}
+This grows linearly in $N$, so the typical size of the accumulated error, $\sqrt{\Var S_N}$, grows like $\sqrt N$.
+Nothing ever pulls it back. \emph{This also holds in any training run.}
+
+\textbf{Step 3: rotation's errors cancel.} The golden-ratio sequence spreads its points very evenly over $[0,1)$: in
+any stretch of consecutive steps, the fraction of thresholds below a level $p$ is close to $p$. So if the weight keeps
+getting the same fraction $p$, rotation rounds up in almost exactly a fraction $p$ of the steps, and the errors
+cancel. Figure~\ref{fig:sim}a shows this. $|S_N|$ stays bounded by $O(\log N)$, against SR's $\sqrt N$. This is the
+same idea as error diffusion (sigma--delta modulation), but without storing the error.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{rotation_fig.pdf}
+\caption{Simulated rounding errors (2000 weights, no training). (a) Constant fraction $p=0.3$: SR's sums wander off,
+rotation's stay near zero. (b) Fractions $p_t$ drawn at random each step: rotation's error still grows like $\sqrt t$,
+but $\sqrt{1-\rho}=\sqrt{1/2}$ times as fast, as Eq.~\eqref{eq:main} predicts (dashed lines).}
+\label{fig:sim}
+\end{figure}
+
+In training, $p_t$ changes from step to step. Suppose the $p_t$ are random, drawn independently of the thresholds,
+and write $F(u)=P(p>u)$. Then
+\begin{equation}
+\Var S_N = N\,(1-\rho)\,\E[p(1-p)] + O(\log^2 N),\qquad
+\rho=\frac{\Var_{u\sim U[0,1)}F(u)}{\E[p(1-p)]}=\frac{\E\min(p,p')-(\E p)^2}{\E[p(1-p)]}\in[0,1],
+\label{eq:main}
+\end{equation}
+where $p,p'$ are two independent draws. Compared with SR's $N\,\E[p(1-p)]$, rotation removes a fraction $\rho$ of
+the random walk.\footnote{Proof sketch: split $e_t=m_t+(F(u_t)-\E p)$, where $m_t$ is the part due to the random
+$p_t$; it has mean zero and is independent across steps. Summed over $t$, the second term is the error of
+approximating $\int F$ by an average of $F$ over the golden-ratio points. Because $F$ is monotone and $\varphi$ has
+bounded continued-fraction coefficients, the Koksma--Hlawka inequality bounds it by $O(\log N)$.} Intuitively, $\rho$
+is the share of the error that is decided by the threshold rather than by the randomness of the update itself; only
+that share can be cancelled.
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item Same fraction every step: $\rho=1$; all of the random walk is removed (Figure~\ref{fig:sim}a).
+\item Fraction uniform on $[0,1)$ (large steps spanning many grid cells): $\rho=\tfrac12$ (Figure~\ref{fig:sim}b).
+\item Small noisy steps around a grid point, typical of training near convergence: $\rho\approx0.3$--$0.4$.
+\end{itemize}
+The irrational step $\varphi$ matters. With $\varphi=0$ (a fixed random threshold per weight, ``frozen dither''), the
+same threshold repeats every step and the error grows linearly into a bias.
+
+\section{Why the accumulated error is what matters for the weights}
+Near a minimum with curvature $h$ and learning rate $\eta$, the distance from the optimum, $d_t=x_t-x^*$, follows
+\[
+d_{t+1}=a\,d_t+q\,e_t,\qquad a=1-\eta h,
+\]
+ignoring gradient noise. Unrolling, $d_T=q\sum_{k\ge0}a^k e_{T-k}$: the weight error is a decaying average of past
+rounding errors, with a memory of about $1/(\eta h)$ steps (hundreds, typically). Its variance is
+\[
+\Var d=q^2\sum_{j,k}a^{j+k}\Cov(e_{T-j},e_{T-k})\;\approx\;\frac{q^2}{2\eta h}\sum_{k=-\infty}^{\infty}\Cov(e_0,e_k)
+=\frac{q^2}{2\eta h}\,\lim_{N\to\infty}\frac{\Var S_N}{N},
+\]
+where the approximation needs the error correlations to die out well within the memory window. So the weights feel
+the long-run growth rate of the error sum, not the per-step error:
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item \textbf{SR}: the errors are uncorrelated, so only the $k=0$ term survives: $\E[p(1-p)]$.
+\item \textbf{Rotation}: same $k=0$ term, but a round-up now makes a round-down likely within the next few steps, so
+the terms $k\ne0$ are negative. They sum to $-\rho\,\E[p(1-p)]$, leaving $(1-\rho)\,\E[p(1-p)]$.
+\end{itemize}
+In the frequency domain, the sum of covariances is the error's power spectrum at zero frequency, while the per-step
+variance is its total power. Both rules have the same total power. SR spreads it evenly over all frequencies (white
+noise). Rotation moves it to high frequencies: fast up--down patterns that cancel within a few steps. The optimizer
+acts as a low-pass filter with cutoff near $\eta h$, so it averages the high-frequency part away and only the
+zero-frequency part reaches the weights. In the simulation of Figure~\ref{fig:sim}b with $\eta h=0.01$, rotation's
+weight-error variance is $0.505$ of SR's, against the predicted $1-\rho=0.5$.
+
+\section{What is proven and what is assumed}
+Steps 1 and 2 are exact in any training run. Step 3 assumes that the fractions $p_t$ do not line up with the
+threshold sequence. In training, $p_t$ depends on earlier rounding through the loss, so this is not automatic: an
+adversary who knew $u_0$ could pick $p_t$ just above $u_t$ every step and force a round-up each time, making the error
+grow linearly. The gradient, however, depends on $u_0$ only indirectly, through the weights that past rounding
+produced, and nothing in it steers $p_t$ toward the next threshold. We therefore expect step 3 to hold in practice.
+It is supported by a one-weight closed-loop simulation with feedback (rotation lowers the excess loss from rounding by
+about 25\% at 0--2 counter bits) and by the training runs below, where rotation is never worse than SR. It is not proven.
+
+\section{Results}
+Two-bit weights trained from scratch, no momentum, same normalized step for both rules, learning rate tuned per
+method, mean of 3 seeds. The metric is validation bits per byte (lower is better). The \emph{gain} is SR minus
+rotation.
+\begin{center}\small
+\begin{tabular}{@{}llcccccc@{}}
+\toprule
+& counter bits $b$ & 0 & 1 & 2 & 4 & 6 & 8 \\
+& state (bits/weight) & 2 & 3 & 4 & 6 & 8 & 10 \\
+\midrule
+2.65M model & SR & 2.570 & 2.383 & 2.228 & 1.976 & 1.938 & 1.918 \\
+WikiText-2, 2.5k steps & rotation & 2.519 & 2.332 & 2.168 & 1.959 & 1.934 & 1.906 \\
+& gain & 0.051 & 0.051 & 0.060 & 0.017 & 0.004 & 0.012 \\
+\midrule
+10.6M model & SR & 2.391 & -- & 2.055 & 1.721 & 1.636 & -- \\
+WikiText-103, 8k steps & rotation & 2.334 & -- & 1.941 & 1.689 & 1.635 & -- \\
+& gain & 0.057 & -- & 0.114 & 0.032 & 0.001 & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+On a teammate's format with learned per-group codebooks instead of a uniform grid (GPEF, 4 bits/weight), rotation also
+beats SR by 0.05, so the effect does not depend on the grid being uniform. On that format, however, GPEF's own
+deterministic choice of the nearest level is better than both (10.6M: 1.889, against 2.261 for rotation and 2.316
+for SR). There the learned fp32 codebook levels already absorb the small updates, so the comparison that matters is
+rotation against SR, not against nearest-level rounding.
+
+\textbf{Where the gain is largest.} Rotation removes rounding noise, not gradient noise, so its gain should be roughly
+\[
+\text{gain}\;\approx\;\rho\times(\text{share of the weight error that comes from rounding}).
+\]
+The two factors move in opposite directions as counter bits are added:
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item \emph{The rounding share falls.} For steps smaller than a grid cell, rounding variance scales like
+$q\cdot|\text{step}|$, so it halves with each extra bit, and gradient noise takes over. By $b=6$ the gain is gone.
+\item \emph{$\rho$ rises.} At $b=0$ a step is a small fraction of a grid level, so $p_t$ sits near 0 or 1 and
+$\rho\approx0.3$. Each extra bit makes the same step twice as large in grid units, which spreads $p_t$ out and pushes
+$\rho$ toward $\tfrac12$ and above.
+\end{itemize}
+Their product peaks at an intermediate budget, which matches the gain being largest around 0--2 counter bits. Two
+caveats. On the small model the gains at $b=0,1,2$ are nearly equal; only the 10M $b=2$ gain stands out, and its
+rotation runs vary by $\pm0.034$ across seeds, so its size is uncertain. And this explanation is an interpretation of
+the theory; we have not measured $\rho$ inside training.
+
+\textbf{Bottom line.} Rotation rounding is a drop-in replacement for stochastic rounding: identical per-step
+statistics, no extra memory, provably better error cancellation when updates do not track the thresholds, and better
+accuracy in every training comparison we have run, most of all at 2--4 bits of training state per weight.
+
+\end{document}
