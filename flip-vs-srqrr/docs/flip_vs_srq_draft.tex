@@ -1,0 +1,167 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[colorlinks=true,urlcolor=blue]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{7pt}
+\begin{document}
+\begin{center}
+{\Large\bfseries Training 2-bit weights with almost no optimizer state}\\[5pt]
+{\small Draft, 2026-11-10. Rotation rounding vs.\ flip, GPEF and quantized-moment baselines}
+\end{center}
+
+\section*{1. Question}
+
+A model whose weights are stored on a 2-bit grid is usually trained with a 32-bit shadow copy and 64 bits of
+Adam moments per weight, about 100 bits of training state for a 2-bit deployed weight. We ask how much accuracy each
+method buys per bit of training state, especially below 4 bits per weight, where a method can afford at most two
+extra bits beyond the deployed code. We compare one momentum-free method family (SRQ: a normalized gradient step
+with stochastic or rotation rounding onto a sub-grid) with a teammate's flip optimizer (quantized momentum), a
+teammate's GPEF (error feedback with learned group codebooks), and Adam/Muon with stochastic rounding and quantized
+moments.
+
+\section*{2. Setting}
+
+\textbf{Format.} Every quantized matrix $W$ deploys codes $K_{ij}\in\{-1.5,-0.5,0.5,1.5\}$ and one scale
+$\alpha$ per matrix, $W=\alpha K$. GPEF and AdamW-STE instead deploy a learned codebook $\{-a,-b,b,a\}$ for every
+group of 32 weights (2 extra bits per weight in fp32 codebook storage). Embeddings, head and norms are fp32 AdamW in
+all methods.
+
+\textbf{State accounting.} \emph{Training state per weight} counts everything kept per quantized weight across
+steps: the 2-bit code plus optimizer state. The transient gradient is not counted.
+
+\textbf{Models and data.} Byte-level transformer language models from the flip harness, trained from scratch:
+2.65M quantized weights on WikiText-2 for 2{,}500 steps (pilot), and 10.6M on WikiText-103 for 8{,}000 steps
+(batch $64\times256$).
+
+\textbf{Protocol.} For each method: a seed-0 learning-rate grid of three values spaced $3\times$, extended by
+$3\times$ at an edge optimum, then seeds 1 and 2 at the seed-0 best. Reported numbers are validation bits per byte
+(mean of 3 seeds). Test data is never read. All final learning rates are interior to the searched grid.
+
+\section*{3. Methods}
+
+\textbf{SRQ (srq\_sr@b$B$, srq\_rot@b$B$; $2+B$ bits/weight).} Each weight has a position $x=K+f$, where $f$ is a
+remainder on the sub-grid $2^{-B}\mathbb Z\cap[-\tfrac12,\tfrac12)$; only $K$ is deployed. One step, with no
+momentum, is
+\[
+\tilde x=\operatorname{clip}\!\left(x-\eta\,\frac{g}{\operatorname{rms}(g)},\,-1.5,\,1.5\right),
+\qquad g=\partial L/\partial W,
+\]
+followed by rounding $\tilde x$ onto the $2^{-B}$ sub-grid; $K$ is the nearest code and $f$ the remainder. With
+$B=0$ the position is the code itself (2 bits/weight). \emph{SR} rounds up with probability equal to the fractional
+part. \emph{Rotation} rounds up when the fractional part exceeds the threshold $\operatorname{frac}(u_0+t\varphi)$,
+with $\varphi=(\sqrt5-1)/2$ and $u_0$ regenerated per entry from a per-matrix seed, so it adds no state. Over
+consecutive steps the thresholds are equidistributed with small gaps, which lowers the variance of accumulated
+rounding error relative to independent draws.
+
+\textbf{Flip (flip@m$B$; $2+B+\approx0.1$ bits/weight).} Teammate optimizer: $B$-bit quantized momentum per
+weight, and each step moves the top-$k$ weights by one code level under row and column caps. 1.58 = ternary
+momentum; ``2g'' = 2-bit momentum with group scales.
+
+\textbf{GPEF (gpef@e$E$; $2+E+2$ bits/weight).} Teammate method: an rms-normalized step in units of the group
+codebook, two least-squares codebook/symbol passes per step (each symbol set to the nearest level), and $E$-bit
+deterministic error feedback ($E=0$: none). To go below 4 bits/weight, gpef@e0g$G$ shares one codebook among $G$
+contiguous weights instead of 32 ($2+64/G$ bits/weight: $G=64$, 128, 256 give 3, 2.5, 2.25); $G=32$ reproduces
+gpef@e0 exactly. As a format-matched check of the rounding rule, gpef\_rot@e0 and gpef\_sr@e0 keep GPEF's step and
+codebook fit but choose each symbol by rotation or stochastic rounding between the two bracketing levels.
+
+\textbf{References.} Adam + SR with both moments quantized to $B$ bits (adam\_sr@m$B$; $2+2B$); Muon + SR with
+$B$-bit momentum (muon\_sr@m$B$; $2+B$); Muon + QAT with fp32 shadow (66); AdamW-STE (teammate, 102).
+
+\section*{4. Results}
+
+\begin{table}[h]\centering\small
+\begin{tabular}{lrrr}
+\toprule
+method & bits/weight & 2.65M & 10.6M\\
+\midrule
+srq\_rot@b0 & 2 & \textbf{2.519} & \textbf{2.334}\\
+srq\_sr@b0 & 2 & 2.570 & 2.391\\
+gpef@e0g256 & 2.25 & \textbf{2.450} & \textbf{2.221}\\
+gpef@e0g128 & 2.5 & 2.377 & 2.133\\
+srq\_rot@b1 & 3 & 2.332 & --\\
+srq\_sr@b1 & 3 & 2.383 & --\\
+gpef@e0g64 & 3 & \textbf{2.260} & \textbf{2.019}\\
+flip@m1.58 & 3.7 & 2.416 & 2.204\\
+srq\_rot@b2 & 4 & 2.168 & 1.941\\
+srq\_sr@b2 & 4 & 2.228 & 2.055\\
+gpef@e0 (group-32 codebooks) & 4 & \textbf{2.135} & \textbf{1.889}\\
+gpef\_rot@e0 (rotation symbols) & 4 & 2.505 & 2.261\\
+gpef\_sr@e0 (SR symbols) & 4 & 2.555 & 2.316\\
+flip@m2 & 4.1 & 2.327 & 2.124\\
+muon\_sr@m2 & 4.1 & 2.641 & 2.545\\
+flip@m2g & 4.25 & 2.242 & 2.058\\
+\midrule
+srq\_rot@b4 & 6 & 1.959 & 1.689\\
+srq\_sr@b4 & 6 & 1.976 & 1.721\\
+flip@m4 & 6.1 & \textbf{1.873} & \textbf{1.676}\\
+adam\_sr@m2 & 6.25 & 2.606 & 2.524\\
+srq\_rot@b6 & 8 & 1.934 & \textbf{1.635}\\
+srq\_sr@b6 & 8 & 1.938 & 1.636\\
+gpef@e4 & 8 & 2.054 & 1.758\\
+adam\_sr@m4 & 10.25 & 2.111 & 1.894\\
+gpef@e8 & 12 & 1.879 & 1.607\\
+\midrule
+muon\_qat (fp32 shadow) & 66 & 1.745 & 1.530\\
+adamw\_ste & 102 & 1.826 & --\\
+\bottomrule
+\end{tabular}
+\caption{Validation bits per byte, mean of 3 seeds (seed sd mostly .002--.02; srq\_rot@b2 at 10.6M .034).
+Pilot-only points (flip@m8 1.853 at 10.1, srq@b8 1.906/1.918 at 10, adam\_sr@m8 2.074, Adam+SR with fp32
+moments 2.067) were not rerun at 10.6M.}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{bits_vs_bpb_10M.png}
+\caption{10.6M model. Lines: mean of 3 seeds at the best learning rate; dots: individual seeds.}
+\end{figure}
+
+\section*{5. Findings}
+
+\textbf{Below 4.5 bits per weight, the teammate's GPEF is the best method at every budget from 2.25 to 4
+bits/weight.} With one learned codebook per 256 weights (2.25 bits/weight) it reaches 2.221 at 10.6M, .11 better
+than rotation rounding with no state at all (2.334 at 2 bits/weight). At 3 bits/weight gpef@e0g64 beats
+srq\_rot@b1 by .07 (2.65M) and flip@m1.58 at 3.7 bits by .19 (10.6M). At 4 bits/weight gpef@e0 beats srq\_rot@b2
+by .03 and .05. Its curve is smooth in group size: each doubling of the group costs about .1 bpb.
+
+\textbf{On the fixed per-matrix format, rotation rounding is the best method below 4.5 bits per weight.} At 4
+bits/weight it beats flip's best low-bit variant (2-bit grouped momentum, 4.25 bits) by .07 at 2.65M and .12 at
+10.6M, and plain SR by .06 and .11. At 2 bits/weight, with no state beyond the code, it trains to 2.33. Flip does
+not fail below 4-bit momentum, but it degrades by .37--.45 bpb when its momentum drops from 4 to 2 bits.
+
+\textbf{Above 6 bits per weight the methods converge.} Flip with 4-bit momentum wins at 6 bits/weight, by .09 at
+2.65M but only .013 at 10.6M. At 8--10 bits/weight rotation and SR are within seed noise (1.635 vs 1.636 at
+10.6M), as expected once the sub-grid is fine enough that rounding variance is negligible.
+
+\textbf{GPEF's advantage comes from its learned codebooks with nearest-level symbols, not from its rounding rule.}
+GPEF@e0 has no error feedback and no momentum. Its learned codebooks also change the deployed model: per-group
+levels instead of our 2 bits plus one scale per matrix. In the format-matched check, choosing GPEF's symbols by
+rotation or stochastic rounding instead of nearest-level makes it much worse (10.6M: 2.261 and 2.316 against 1.889).
+Rotation still beats SR there by .05 at both sizes, so the rounding-rule ranking holds on a non-uniform format. Our
+reading, not yet tested, is that the fp32 codebook levels already integrate the small updates, so randomizing the
+symbols only adds noise. With error feedback GPEF spends extra bits less efficiently than SRQ (gpef@e4 1.758 vs
+srq\_rot@b6 1.635 at 8 bits/weight).
+
+\textbf{Adam- and Muon-direction updates with stochastic rounding are poor at any budget.} Adam + SR stays near 2.07
+at 2.65M even with fp32 moments, and collapses with 2-bit moments; Muon + SR at 4--6 bits/weight is .4--.6 worse
+than flip and SRQ. The limit is the combination of these directions with rounding onto 2-bit codes, not moment
+precision.
+
+\textbf{Gap to full-precision training.} At 10.6M the best method within 8 bits/weight (srq\_rot@b6, 1.635) is .10
+from Muon + QAT with an fp32 shadow (1.530, 66 bits/weight); within 6 bits/weight flip@m4 is .15 away.
+
+\section*{6. Limitations and next steps}
+
+\begin{itemize}\setlength\itemsep{2pt}
+\item Two sizes (2.65M, 10.6M) and one data family. 25.2M (about 3 h per run) not yet run.
+\item GPEF and SRQ differ in deployed format as well as in update rule. The format-matched check shows that
+  stochastic symbols hurt on GPEF's format; the converse test, GPEF's nearest-level update on the per-matrix grid,
+  has not been run, so how much of GPEF's lead is format alone is open.
+\item srq@b1 was run at 2.65M only.
+\item The per-row scale refit (srqrr) hurt at 2.65M and was dropped; at 10.6M it has seed 0 only.
+\item Flip@m8, srq@b8, AdamW-STE and Adam + SR with fp32 moments were run at 2.65M only.
+\end{itemize}
+
+\end{document}
