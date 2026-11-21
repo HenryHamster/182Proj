@@ -119,6 +119,26 @@ def main():
         ax.grid(True, color="#e6e6e6", lw=0.6)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
+    # The five 64-102 b/w references sit within 0.09 bpb at 50M: zoom on them.
+    ins = axes[1].inset_axes([0.40, 0.40, 0.44, 0.32])
+    lab = {m: (7, 0, "left") for m in ("fp_muon", "muon_qat", "adam_qat", "fp_adam", "adamw_ste")}
+    for m, fam, mk in singles:
+        if m not in lab:
+            continue
+        p = R[m][0]
+        ins.scatter(p["bits"], p["mean"], marker=mk, s=60 if mk == "D" else 46,
+                    color=COLORS[FAM_ORDER.index(fam)], edgecolors="white", lw=0.8, zorder=3)
+        dx, dy, ha = lab[m]
+        ins.annotate(f"{m} {p['mean']:.3f}", (p["bits"], p["mean"]), xytext=(dx, dy),
+                     textcoords="offset points", ha=ha, va="center", fontsize=6.5, color="#333")
+    ins.set_xscale("log", base=2)
+    ins.set_xlim(54, 300); ins.set_ylim(1.115, 1.235)
+    ins.set_xticks([64, 96]); ins.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ins.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ins.tick_params(labelsize=6.5)
+    ins.grid(True, color="#eeeeee", lw=0.5)
+    ins.set_title("references, zoomed", fontsize=7)
+    axes[1].indicate_inset([56, 1.115, 74, 0.12], ins, edgecolor="#999")
     axes[0].set_ylabel("val bits per byte (lower is better)")
     h = [Line2D([], [], marker="o", color=COLORS[FAM_ORDER.index(f)], lw=2, mec="white",
                 label={"SR": "SR (b0, b2, b6)", "RR": "RR (b0, b2, b6)",
