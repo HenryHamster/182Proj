@@ -1,7 +1,7 @@
 """Paper figures 1-3, drawn at print size (5.5 in text width, 8 pt text) so nothing is rescaled in LaTeX.
 
 Selection rule everywhere: best lr = lowest seed-0 val bpb among non-diverged runs; plotted value = mean over all
-seeds at that lr; error bar / band = min-max over those seeds (3 seeds at 10M, 2 at 50M).
+seeds at that lr; error bar / band = min-max over those seeds (3 seeds at 10M, 2 at 50M and 100M).
 Val split only (test aliased to val). Writes fig1_frontier.pdf/png, fig2_curves.pdf/png, fig3_scale.pdf/png.
 """
 import json, math, statistics as st, collections as C
@@ -88,8 +88,8 @@ for m, lab, mk in (("adam_qat", "Adam QAT", "s"), ("adamw_ste", "AdamW STE", "D"
                 marker=mk, ms=3.8, mfc="white", mew=1, ls="none", elinewidth=.9, capsize=2, zorder=3,
                 label=f"{lab} (shadow)")
 logx(ax, [2, 3, 4, 6, 8, 12, 16, 32, 64, 100], (1.8, 115))
-ax.set_xlabel("optimizer + weight state (bits per weight, log scale)")
-ax.set_ylabel("validation BPB (lower is better)"); ax.set_ylim(1.4, 2.7)
+ax.set_xlabel("Optimizer + weight state (bits per weight, log scale)")
+ax.set_ylabel("Validation BPB (lower is better)"); ax.set_ylim(1.4, 2.7)
 ax.legend(frameon=False, loc="upper right", handlelength=2.2, borderaxespad=0, ncol=2, columnspacing=1.2, labelspacing=.3)
 save(fig, "fig1_frontier")
 
@@ -131,8 +131,8 @@ for i, (ax, (title, ms)) in enumerate(zip(axs.flat, P)):
     lg.get_frame().set(facecolor="white", edgecolor="none", alpha=.9); lg.set_zorder(5)
     ax.set_ylim(1.3, 3.5); ax.set_xlim(0, 8000)
     ax.set_xticks([0, 2000, 4000, 6000, 8000]); ax.set_xticklabels(["0", "2k", "4k", "6k", "8k"])
-for ax in axs[1]: ax.set_xlabel("training step")
-for ax in axs[:, 0]: ax.set_ylabel("train loss (bits/byte)")
+for ax in axs[1]: ax.set_xlabel("Training step")
+for ax in axs[:, 0]: ax.set_ylabel("Train loss (bits/byte)")
 fig.tight_layout(h_pad=.8, w_pad=.6)
 save(fig, "fig2_curves")
 
@@ -160,7 +160,7 @@ for ax, g, title in ((axs[0], g10q, "10.6M, 8k steps, 3 seeds"), (axs[1], g50, "
                 ha="left", va=va, fontsize=5.6, color=MUTED)
     logx(ax, [2, 3, 4, 6, 8], (1.85, 9.5)); ax.set_ylim(0.88, 2.65)
     ax.set_title(title, loc="left", color=INK, pad=2, fontsize=6.8)
-axs[0].set_ylabel("validation BPB"); axs[1].set_xlabel("state (bits per weight, log scale)")
+axs[0].set_ylabel("Validation BPB"); axs[1].set_xlabel("State (bits per weight, log scale)")
 h = [Line2D([], [], color=FAM[f][0], marker=FAM[f][1], mec="white", mew=.6, ms=3.8, lw=1.4, label=l)
      for f, l in (("GPEF", "GPEF (ours)"), ("RR", "RR (ours)"), ("SR", "SR"))]
 h += [Line2D([], [], color=FAM[f][0], marker=FAM[f][1], mec="white", mew=.6, ms=5, ls="none", label=l)
