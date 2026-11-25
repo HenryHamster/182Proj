@@ -79,6 +79,8 @@ Preset `100M` (d=768, 14 layers, 60k steps, about 20 bytes per weight). The 6 me
 
 ![val bpb vs model size](figures/fig3_scale.png)
 
+Report figures and tables: see [REPRODUCE.md](REPRODUCE.md).
+
 ## Layout
 
 | path | contents |
