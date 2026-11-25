@@ -5,7 +5,7 @@ W = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root
 sys.path.insert(0, W)
 import torch
 torch.set_num_threads(4)
-import qtrain as Q, srq_ext, team_ext as T, team_rot, team_grp as TG
+import qtrain as Q, srq_ext, team_ext as T, team_grp as TG
 
 torch.manual_seed(1)
 W0 = torch.randn(96, 192) * .1

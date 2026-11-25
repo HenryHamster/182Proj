@@ -6,7 +6,7 @@ W = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root
 sys.path.insert(0, W)
 import torch
 torch.set_num_threads(4)
-import qtrain as Q, srq_ext, team_ext as T, team_rot, team_grp, team_gpx, team_gpf as V
+import qtrain as Q, srq_ext, team_ext as T, team_grp, team_gpf as V
 
 
 def pair(m1, m2, steps=40, lr=.03, scale=1e-2, same=True):
