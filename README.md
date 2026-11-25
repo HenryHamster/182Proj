@@ -60,6 +60,9 @@ python figures/paper_tables.py    # Tables 3-4 -> figures/lr_table.tex, figures/
 | Fig. 3, scaling to 49.2M and 99.1M | `figures/paper_figs.py` | `campaign_10M.jsonl`, `10M.jsonl`, `campaign_50M.jsonl`, `campaign_100M.jsonl` |
 | Table 3, learning-rate grids (appendix) | `figures/paper_tables.py` | same as Fig. 3 |
 | Table 4, GPEF ablations (appendix) | `figures/paper_tables.py` | `campaign_10M.jsonl` |
+| Sec. 7, GPEF indices rounded by RR/SR (`gpef_rot@e0`, `gpef_sr@e0`) and on a frozen grid (`gpef_frz@e0_near`) | `team_rot.py`, `team_gpx.py`; `campaigns/campaign_rot.py`, `campaigns/campaign_gpx.py` | `campaign_10M.jsonl` |
+| Sec. 7, rotation-rounded 4-bit residual (`gpefx@e4g32_narrow_rot_b0.99`; 1.646 at 10.6M, 1.437 at 49.2M) | `team_gpx.py`; `campaigns/campaign_gpx.py`, `campaigns/campaign_gpefix_50M.py`; record `docs/RECORD_flip-vs-srqrr-003.md` | `campaign_10M.jsonl`, `campaign_50M_gpefix.jsonl` |
+| Sec. 7, zero-update diagnostic (index moves per step at lr 0) | `python tests/zero_lr.py .` (CPU, about a minute) | none |
 
 **Selection rule**, used by every script:
 
