@@ -61,6 +61,24 @@ and the 4-bit RR seeds differ by 0.083. Details and limits are in
 
 ![val bpb vs state bits/weight, 10M and 50M](figures/bits_vs_bpb_50M.png)
 
+## Results at 99.1M (val bpb, mean of 2 seeds; 50M in brackets)
+
+Preset `100M` (d=768, 14 layers, 60k steps, about 20 bytes per weight). The 6 methods were chosen by Henry.
+
+| state bits/weight | SR | RR | GPEF | other |
+|---|---|---|---|---|
+| 2 | 1.961 (2.026) | **1.872** (1.933) | | |
+| 4 | | | **1.321** (1.478) | |
+| 8 | 1.159 (1.260) | **1.143** (1.243) | | |
+| 64 | | | | fp Muon **1.053** (1.131) |
+
+- RR beats SR at both budgets by the same margins as at 50M.
+- Most best lrs are at the top of their 2-point grid.
+- Details are in [docs/RECORD_flip-vs-srqrr-004.md](docs/RECORD_flip-vs-srqrr-004.md).
+- The GPEF error-storage follow-up at 50M is in [docs/RECORD_flip-vs-srqrr-003.md](docs/RECORD_flip-vs-srqrr-003.md).
+
+![val bpb vs model size](figures/fig3_scale.png)
+
 ## Layout
 
 | path | contents |
@@ -73,8 +91,8 @@ and the 4-bit RR seeds differ by 0.083. Details and limits are in
 | `team_rot.py`, `team_grp.py`, `team_gpx.py`, `team_gpf.py` | GPEF variants: RR/SR rounding on GPEF codebooks, larger groups, rotation × GPEF error storage, and the teammate's revisions. |
 | `campaigns/` | The executed sweep scripts. `campaign.py` defines the protocol; each `campaign_*.py` is one recorded phase. |
 | `tests/` | CPU checks for each extension (equivalence to the notebook, on-grid codes, unbiasedness, drift). |
-| `results/` | Run records (`campaign_10M.jsonl`, `campaign_50M.jsonl`, `campaign_pilot.jsonl`, plus `10M.jsonl` / `pilot.jsonl` from the scale study). Each record has `val_bpb`, `train_eval_bpb`, `state_bits`, and `curve` (train loss in nats every 100 steps). |
-| `figures/` | Every figure and the script that draws it from `results/`. |
+| `results/` | Run records (`campaign_10M.jsonl`, `campaign_50M.jsonl`, `campaign_100M.jsonl`, `campaign_50M_gpefix.jsonl`, `campaign_pilot.jsonl`, plus `10M.jsonl` / `pilot.jsonl` from the scale study). Each record has `val_bpb`, `train_eval_bpb`, `state_bits`, and `curve` (train loss in nats every 100 steps). |
+| `figures/` | Every figure and the script that draws it from `results/`. The report's figures (`fig1-3`) come from `paper_figs.py`; its learning-rate table (`lr_table.tex`) comes from `paper_tables.py`. |
 | `docs/` | Experiment records, the rotation-rounding derivation (`rotation_rounding.tex`), and the draft. |
 
 Each extension registers its methods into `qtrain` on import and leaves the existing methods unchanged. `drive.py`
@@ -89,6 +107,8 @@ python tests/srq_test.py                                      # CPU, needs data/
 python campaigns/campaign.py                                  # full protocol; resumable; GPU admission at 72% of 16 GB
 uv run --with matplotlib python figures/plot_family_bits.py
 uv run --with matplotlib python figures/plot_50M.py --fig    # 50M vs 10M table and figure
+uv run --with matplotlib python figures/paper_figs.py        # report figures fig1-3 (pdf + png)
+python figures/paper_tables.py                                # report lr table -> figures/lr_table.tex
 ```
 
 `plot_bits.py` and `plot_curves.py` take `10M` or `pilot` as an argument.

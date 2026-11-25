@@ -251,6 +251,7 @@ PRESETS = {   # quantized weights = 12 * d^2 * layers
     "10M":   dict(d=384, layers=6,  heads=6,  ctx=256, batch=64, micro=64, steps=8000,  fp_lr=1e-3),   # 10.6M
     "25M":   dict(d=512, layers=8,  heads=8,  ctx=512, batch=64, micro=32, steps=15000, fp_lr=1e-3),   # 25.2M
     "50M":   dict(d=640, layers=10, heads=10, ctx=512, batch=64, micro=64, steps=30000, fp_lr=1e-3),   # 49.2M (added; ~20 bytes/weight)
+    "100M":  dict(d=768, layers=14, heads=12, ctx=512, batch=64, micro=64, steps=60000, fp_lr=1e-3),   # 99.1M (flip-vs-srqrr-004; ~20 bytes/weight as 50M)
     "85M":   dict(d=768, layers=12, heads=12, ctx=512, batch=128, micro=32, steps=30000, fp_lr=6e-4),  # 84.9M
 }
 
