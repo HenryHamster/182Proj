@@ -4,8 +4,8 @@ Stage 1: GPEF error-storage ladder at E=4, groups of 32 (8 b/w; baseline gpef@e4
 Stage 2: the best ladder variant (3-seed mean) at e2g256 (4.25 b/w) and e2g32 (6 b/w), plus the references the teammate
 asked for: adamw_ste (theirs, group-32 format), adam_qat (harness AdamW-STE, per-matrix format, pairs with muon_qat),
 fp_adam and fp_muon (no quantization).
-The report uses only the Stage-2 references. The Stage-1 ladder (gpefx, team_gpx.py) was removed from the
-repo. To regenerate the references alone: C.phase("10M", {"adamw_ste": G3, "adam_qat": G3, "fp_adam": G3, "fp_muon": [0.003, 0.01, 0.03]}, ext=1)."""
+The Stage-1 ladder (gpefx, team_gpx.py) backs the Discussion's fixed-storage result (1.646); the Stage-2 references
+back the figures. To regenerate the references alone: C.phase("10M", {"adamw_ste": G3, "adam_qat": G3, "fp_adam": G3, "fp_muon": [0.003, 0.01, 0.03]}, ext=1)."""
 import statistics as st
 import campaign as C
 
