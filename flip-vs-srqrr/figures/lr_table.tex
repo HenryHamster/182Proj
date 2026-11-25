@@ -1,0 +1,24 @@
+\begin{tabular}{lrlll}
+\toprule
+Method & b/w & 10.6M & 49.2M & 99.1M \\
+\midrule
+GPEF, $S{=}256$, no residual & 2.25 & \textbf{.03} \{.01, .03, .09, .27\} & \textbf{.03}$^\dagger$ \{.01, .03\} & -- \\
+GPEF, no residual & 4 & \textbf{.03} \{.01, .03, .09\} & \textbf{.03}$^\dagger$ \{.01, .03\} & \textbf{.03}$^\dagger$ \{.01, .03\} \\
+GPEF, 4-bit residual & 8 & \textbf{.03} \{.01, .03, .09\} & \textbf{.01} \{.0033, .01, .03\} & -- \\
+GPEF, 8-bit residual & 12 & \textbf{.01} \{.0033, .01, .03\} & -- & -- \\
+RR & 2 & \textbf{.03} \{.01, .03, .09\} & \textbf{.03}$^\dagger$ \{.01, .03\} & \textbf{.01}$^\dagger$ \{.01, .03\} \\
+RR, 2-bit residual & 4 & \textbf{.03} \{.01, .03, .09\} & \textbf{.03}$^\dagger$ \{.01, .03\} & -- \\
+RR, 6-bit residual & 8 & \textbf{.03} \{.03\} & \textbf{.01} \{.0033, .01, .03\} & \textbf{.01}$^\dagger$ \{.0033, .01\} \\
+SR & 2 & \textbf{.03} \{.01, .03, .09\} & \textbf{.01} \{.0033, .01, .03\} & \textbf{.01}$^\dagger$ \{.0033, .01\} \\
+SR, 2-bit residual & 4 & \textbf{.03} \{.01, .03, .09\} & \textbf{.01} \{.0033, .01, .03\} & -- \\
+SR, 6-bit residual & 8 & \textbf{.03} \{.03\} & \textbf{.01} \{.0033, .01, .03\} & \textbf{.01}$^\dagger$ \{.0033, .01\} \\
+Muon+SR, 2-bit momentum & 4.06 & \textbf{.001} \{3.3e-4, .001, .003, .009\} & \textbf{1.1e-4}$^\dagger$ \{1.1e-4, 3.3e-4, .001\} & -- \\
+Adam+SR, 2-bit moments & 6.12 & \textbf{.0033} \{.0033\} & \textbf{.0033}$^\dagger$ \{.0011, .0033\} & -- \\
+Adam+SR, 4-bit moments & 10.1 & \textbf{.09} \{.09\} & -- & -- \\
+Muon (FP) & 64 & \textbf{.01} \{.003, .01, .03\} & \textbf{.0033} \{.0011, .0033, .01\} & \textbf{.0033}$^\dagger$ \{.0011, .0033\} \\
+Adam (FP) & 96 & \textbf{.03} \{.01, .03, .09\} & \textbf{.01} \{.0033, .01, .03\} & -- \\
+Muon QAT & 66 & \textbf{.01} \{.003, .01, .03\} & \textbf{.0033} \{.0011, .0033, .01\} & -- \\
+Adam QAT & 98 & \textbf{.09} \{.01, .03, .09, .27\} & \textbf{.03}$^\dagger$ \{.01, .03\} & -- \\
+AdamW STE & 102 & \textbf{.03} \{.01, .03, .09\} & \textbf{.03}$^\dagger$ \{.01, .03\} & -- \\
+\bottomrule
+\end{tabular}
