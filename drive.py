@@ -8,9 +8,7 @@ sys.path.insert(0, W)
 import torch, qtrain as Q
 import srq_ext  # registers srq_sr/srq_rot/srqrr@bB (no effect on existing methods)
 import team_ext  # registers gpef@eE, adamw_ste, adam_sr@mB (no effect on existing methods)
-import team_rot  # registers gpef_rot@e0, gpef_sr@e0 (format-matched rounding check; no effect on existing methods)
 import team_grp  # registers gpef@e0gG, G in 32/64/128/256 (GPEF below 4 b/w; no effect on existing methods)
-import team_gpx  # registers gpefx@eEgG_<scale>_<rnd>_b<beta>, gpef_frz@e0_<rnd> (rotation x GPEF; no effect on existing methods)
 import team_gpf  # registers gpefv@... (teammate GPEF revisions 2026-11-12; no effect on existing methods)
 
 def load(name):

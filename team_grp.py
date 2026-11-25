@@ -1,6 +1,6 @@
 """GPEF below 4 bits/weight (Henry 2026-11-10 'add it'): gpef@e0 with larger codebook groups.
 
-Import after team_ext (and team_rot); registers, without changing existing methods:
+Import after team_ext; registers, without changing existing methods:
   gpef@e0gG   GPEF@e0 (no error feedback) with one learned codebook {-a,-b,b,a} per G contiguous weights of the row-major
               flattened matrix, G in {32, 64, 128, 256}. With G=32 this is gpef@e0 exactly (team_grp_test.py checks).
               State 2 + 64/G bits/weight: G=64 -> 3, 128 -> 2.5, 256 -> 2.25.
