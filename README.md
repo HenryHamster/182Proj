@@ -50,7 +50,7 @@ The run records in `results/*.jsonl` are committed, so every figure and table re
 ```bash
 pip install matplotlib
 python figures/paper_figs.py      # Fig. 1-3 -> figures/fig{1,2,3}_*.pdf/.png
-python figures/paper_tables.py    # learning-rate table -> figures/lr_table.tex
+python figures/paper_tables.py    # Tables 3-4 -> figures/lr_table.tex, figures/ablation_table.tex
 ```
 
 | report item | script | inputs (`results/`) |
@@ -58,8 +58,8 @@ python figures/paper_tables.py    # learning-rate table -> figures/lr_table.tex
 | Fig. 1, quality vs state b/w (10.6M) | `figures/paper_figs.py` | `campaign_10M.jsonl` |
 | Fig. 2, training curves at matched state (10.6M) | `figures/paper_figs.py` | `campaign_10M.jsonl` |
 | Fig. 3, scaling to 49.2M and 99.1M | `figures/paper_figs.py` | `campaign_10M.jsonl`, `10M.jsonl`, `campaign_50M.jsonl`, `campaign_100M.jsonl` |
-| Learning-rate table (appendix) | `figures/paper_tables.py` | same as Fig. 3 |
-| GPEF ablations (appendix) | `docs/RECORD_flip-vs-srqrr-001.md` | `campaign_10M.jsonl` |
+| Table 3, learning-rate grids (appendix) | `figures/paper_tables.py` | same as Fig. 3 |
+| Table 4, GPEF ablations (appendix) | `figures/paper_tables.py` | `campaign_10M.jsonl` |
 
 **Selection rule**, used by every script:
 

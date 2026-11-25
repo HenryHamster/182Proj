@@ -1,0 +1,12 @@
+\begin{tabular}{lll}
+\toprule
+Setting & Default & Alternative \\
+\midrule
+Clip, 2.25 b/w & $c = 4$: 2.221 & $c = 2$: 2.251 \\
+Clip, 12 b/w & $c = 4$: 1.607 & $c = 2$: 1.611 \\
+8-bit residual & INT8: 1.607 & FP8: 1.639 \\
+4-bit residual & INT4: 1.758 & FP4: 1.866 \\
+Momentum (FP8 residual) & none: 1.639 & $\beta = 0.9$: 1.897; $\beta = 0.99$: 2.132 \\
+Group size & 32: 1.889 & 64: 2.019; 128: 2.133; 256: 2.221 \\
+\bottomrule
+\end{tabular}
